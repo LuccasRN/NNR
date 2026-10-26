@@ -87,8 +87,8 @@ class MultiClassDetector(nn.Module):
 
     deep=False : backbone identique au TP (3 conv stride 2 : 3 -> 8 -> 16 -> 32 canaux).
     deep=True  : chaque étage contient en plus une convolution de stride 1 ; la sortie
-    reste 32x8x8, mais le champ réceptif est plus grand (le triangle et le carré ne se
-    distinguent que par leurs coins, qui doivent être "vus" ensemble).
+    reste 32x8x8, mais le champ réceptif est plus grand et le réseau a plus de capacité
+    (meilleure localisation de figures de formes et couleurs variées).
     """
 
     def __init__(self, num_classes: int = NUM_CLASSES, deep: bool = True) -> None:
