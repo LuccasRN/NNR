@@ -1,0 +1,12 @@
+body{font-family:"DejaVu Serif",Georgia,serif;font-size:10.5pt;line-height:1.35;max-width:none;margin:0;color:#111}
+h1{font-size:14pt;margin:14px 0 6px;border-bottom:1px solid #999}
+header h1.title{font-size:17pt;border:none;text-align:center;margin-bottom:2px}
+p.subtitle,p.author{text-align:center;margin:2px}
+table{border-collapse:collapse;margin:8px auto;font-size:9.5pt}
+th,td{border:1px solid #bbb;padding:3px 7px}
+th{background:#eee}
+figure{margin:8px 0;text-align:center;break-inside:avoid}
+figcaption{font-size:9pt;font-style:italic}
+code{font-size:9pt}
+math[display=block]{margin:6px 0}
+p:has(> strong:only-child){break-after:avoid}
