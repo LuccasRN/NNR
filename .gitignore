@@ -3,3 +3,4 @@ __pycache__/
 sujet_tensorboard.zip
 runs/
 *.pt
+rnn/

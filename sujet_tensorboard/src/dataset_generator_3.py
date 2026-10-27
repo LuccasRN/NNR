@@ -4,6 +4,11 @@
 Les figures sont dessinées dans l'ordre de leurs annotations.
 """
 
+# --- Resumen en español ---
+# Generador pensado para la OPCIÓN C (no se usa en la opción B).
+# Pone VARIAS figuras en la misma imagen, colocando cada una cerca de la anterior
+# para que se superpongan. La etiqueta tiene una línea "cx cy w h" por figura.
+
 import argparse
 import random
 from pathlib import Path
@@ -11,11 +16,12 @@ from pathlib import Path
 from PIL import Image, ImageDraw
 
 SHAPES = ("circle", "square", "triangle")
-COLOR = (230, 75, 60)
+COLOR = (230, 75, 60)   # todas las figuras en rojo, como en el TP
 OUTLINE = (25, 25, 25)
 
 
 def draw_shape(draw, shape, box):
+    # Igual que en dataset_generator.py
     x1, y1, x2, y2 = box
 
     if shape == "circle":
@@ -37,7 +43,7 @@ def make_example(size, shape, rng, min_objects = 2, max_objects = 2):
     image = Image.new("RGB", (size, size), (background,) * 3)
     draw = ImageDraw.Draw(image)
 
-    n_objects = rng.randint(min_objects, max_objects)
+    n_objects = rng.randint(min_objects, max_objects)  # cuántas figuras en esta imagen
     boxes = []
 
     for i in range(n_objects):
@@ -50,6 +56,7 @@ def make_example(size, shape, rng, min_objects = 2, max_objects = 2):
         else:
             # Figures suivantes : placement proche de la précédente
             # pour favoriser le chevauchement
+            # (centro = centro de la figura anterior + un pequeño desplazamiento aleatorio)
             px1, py1, px2, py2 = boxes[-1]
             prev_cx = (px1 + px2) / 2
             prev_cy = (py1 + py2) / 2
@@ -64,6 +71,7 @@ def make_example(size, shape, rng, min_objects = 2, max_objects = 2):
             x1 = round(prev_cx - side / 2 + jitter_x)
             y1 = round(prev_cy - side / 2 + jitter_y)
 
+            # Se recorta la posición para que la figura no se salga de la imagen
             x1 = max(0, min(x1, size - side - 1))
             y1 = max(0, min(y1, size - side - 1))
 
@@ -73,6 +81,7 @@ def make_example(size, shape, rng, min_objects = 2, max_objects = 2):
         # Les figures dessinées plus tard peuvent masquer les précédentes
         draw_shape(draw, shape, box)
 
+    # Una línea de etiqueta "cx cy w h" por figura
     labels = []
     for x1, y1, x2, y2 in boxes:
         cx = (x1 + x2) / 2
@@ -108,6 +117,8 @@ def generate(
         folder.mkdir(parents=True, exist_ok=True)
 
         for i in range(total):
+            # OJO: el orden de los argumentos no coincide con la firma de make_example
+            # (size, shape, rng, min_objects, max_objects): esta llamada fallaría si se ejecuta.
             image, label = make_example(
                 size, shape, min_objects, max_objects, rng
             )
@@ -122,5 +133,4 @@ def generate(
     print(
         f"Figures : {shape}, de {min_objects} à {max_objects} par image"
     )
-
 
