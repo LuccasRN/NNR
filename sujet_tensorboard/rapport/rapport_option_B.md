@@ -52,39 +52,43 @@ meilleure boîte. Sa classe est $\arg\max_k p(k)$ avec la probabilité $p(k)$ af
 
 # 4. Codage, décodage et perte modifiés
 
-**Codage** (stride $S=8$, grille $G=8$, taille $N=64$). La cellule responsable est celle qui contient le centre :
-$j=\lfloor c_x/S\rfloor$, $i=\lfloor c_y/S\rfloor$. La cible passe de $5\times G\times G$ à $6\times G\times G$ :
+**Codage (étiquette → cible).** L'image de 64 pixels est découpée en une grille de 8 × 8 cellules de 8 pixels.
+La cellule *responsable* est celle qui contient le centre de la figure :
+colonne = partie entière de cx / 8, ligne = partie entière de cy / 8.
+Dans cette cellule, la cible contient **6 valeurs**, une de plus que dans le TP ; toutes les autres cellules valent 0.
 
-$$
-Y_{:,i,j} = \Big(1,\ \tfrac{c_x}{S}-j,\ \tfrac{c_y}{S}-i,\ \tfrac{w}{N},\ \tfrac{h}{N},\ k\Big),
-\qquad Y_{:,i',j'} = 0 \ \text{pour toute autre cellule},
-$$
+| valeur | signification | calcul |
+|---|---|---|
+| objet | une figure est présente | 1 |
+| dx, dy | position du centre dans la cellule (entre 0 et 1) | partie décimale de cx / 8 et de cy / 8 |
+| w, h | taille de la boîte par rapport à l'image | w / 64 et h / 64 |
+| **classe** | **nouveau** : numéro de la forme | 0 (cercle), 1 (carré) ou 2 (triangle) |
 
-où $k\in\{0,1,2\}$ est le numéro de la classe (6ᵉ canal, lu uniquement sur la cellule positive).
+Exemple : l'étiquette `25 14 16 16 1` (carré de 16 pixels centré en (25, 14)) donne la cellule ligne 1, colonne 3,
+avec la cible (1 ; 0,125 ; 0,75 ; 0,25 ; 0,25 ; 1).
 
-**Décodage** (inchangé pour la boîte, ajout du softmax pour la classe) : pour la cellule $(i, j)$,
+**Décodage (sortie du réseau → boîte et classe).** Pour la boîte, rien ne change : une sigmoïde ramène les
+5 premières valeurs entre 0 et 1, puis on revient aux pixels :
 
-$$
-\hat c_x=(j+\sigma(t_x))\,S,\quad \hat c_y=(i+\sigma(t_y))\,S,\quad \hat w=\sigma(t_w)\,N,\quad \hat h=\sigma(t_h)\,N,
-$$
+> centre x = (colonne + dx) × 8, centre y = (ligne + dy) × 8 ;  
+> largeur = w × 64, hauteur = h × 64.
 
-$$
-[x_1,y_1,x_2,y_2]=\big[\hat c_x-\tfrac{\hat w}{2},\ \hat c_y-\tfrac{\hat h}{2},\ \hat c_x+\tfrac{\hat w}{2},\ \hat c_y+\tfrac{\hat h}{2}\big],\qquad
-\text{score}=\sigma(t_o),\qquad p(k)=\frac{e^{z_k}}{\sum_{k'} e^{z_{k'}}}.
-$$
+**Nouveau :** les 3 dernières valeurs passent par un *softmax*, qui les transforme en 3 probabilités
+(cercle, carré, triangle) dont la somme vaut 1. La classe prédite est la plus probable.
 
-**Perte.** On ajoute à la perte du TP une entropie croisée sur la classe, calculée **seulement sur la cellule
-positive** (ailleurs il n'y a pas d'objet, donc pas de classe à apprendre) :
+**Perte.** On garde les deux termes du TP et on en ajoute un troisième pour la classe :
 
-$$
-\mathcal L=\underbrace{\text{BCE}_{w_+=10}(t_o,\,o)}_{\text{64 cellules}}
-+\lambda_{box}\,\underbrace{\big\|\sigma(t_{x,y,w,h})-(d_x,d_y,\tfrac{w}{N},\tfrac{h}{N})\big\|^2}_{\text{cellule positive (MSE)}}
-+\lambda_{cls}\,\underbrace{\Big(-\log\frac{e^{z_k}}{\sum_{k'}e^{z_{k'}}}\Big)}_{\text{cellule positive (CE)}}
-$$
+> **perte = BCE (objet) + 10 × MSE (boîte) + 1 × CE (classe)**
 
-avec $\lambda_{box}=10$, $\lambda_{cls}=1$ et un poids $w_+=10$ sur la cellule positive pour compenser le
-déséquilibre 1 positive / 63 négatives. On n'optimise pas l'IoU directement : elle est nulle (gradient nul)
-dès que les boîtes ne se chevauchent pas et non dérivable aux bords de l'intersection.
+* **BCE** (entropie croisée binaire) : « y a-t-il un objet ? », sur les 64 cellules. La cellule positive reçoit un
+  poids de 10 pour compenser le déséquilibre (1 cellule positive pour 63 négatives).
+* **MSE** (erreur quadratique) : écart entre (dx, dy, w, h) prédits et vrais, sur la cellule positive seulement.
+  Ces erreurs étant petites, on les multiplie par 10.
+* **CE** (entropie croisée, **nouveau**) : vaut −log(probabilité donnée à la bonne forme) ; elle est presque nulle si
+  le réseau est sûr et a raison, et grande s'il se trompe avec assurance. Elle n'est calculée que sur la cellule
+  positive : ailleurs il n'y a pas d'objet, donc pas de classe à apprendre.
+
+On n'optimise pas l'IoU directement : elle vaut 0 (donc aucun gradient) dès que les boîtes ne se chevauchent pas.
 
 # 5. Protocole expérimental
 
