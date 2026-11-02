@@ -1,16 +1,16 @@
 ---
 title: "Détection d'une figure dans une image — Mini-projet, Option B : plusieurs classes de formes"
 subtitle: "Réseaux de neurones — TP et mini-projet"
-author: "[Nom Prénom]"
+author: "Lucas Rodriguez"
 lang: fr
 ---
 
 # 1. Objectif
 
-Le TP consistait à entraîner un détecteur qui, sur une image RGB $64\times64$ contenant **une seule figure
-toujours identique** (un disque rouge), prédit la présence d'un objet et sa boîte englobante $(c_x, c_y, w, h)$.
-L'**Option B** étend ce détecteur : le générateur produit des **cercles, carrés et triangles de couleurs
-variées**, et le réseau doit prédire la **classe** de la figure en plus de sa boîte. Le code se compose de :
+Le TP consistait à entraîner un détecteur qui, sur une image RGB $64\times64$ contenant une seule figure
+toujours identique (un disque rouge), prédit la présence d'un objet et sa boîte englobante $(c_x, c_y, w, h)$.
+L'Option B étend ce détecteur : le générateur produit des cercles, carrés et triangles de couleurs
+variées, et le réseau doit prédire la classe de la figure en plus de sa boîte. Le code se compose de :
 
 | fichier | rôle |
 |---|---|
@@ -19,8 +19,6 @@ variées**, et le réseau doit prédire la **classe** de la figure en plus de sa
 | `src/train_multiclass.py` | entraînement d'une époque, évaluation, courbes, script complet |
 | `notebooks/mini_projet_option_B.ipynb` | démarche complète commentée : TP, extension, résultats, figures |
 
-Seules les bibliothèques du TP sont utilisées (`torch`, `numpy`, `PIL`, `matplotlib`).
-
 # 2. Rappel : le détecteur du TP
 
 Image $3\times64\times64$ → *backbone* de 3 blocs « conv $3\times3$ stride 2 + BatchNorm + ReLU »
@@ -28,13 +26,13 @@ Image $3\times64\times64$ → *backbone* de 3 blocs « conv $3\times3$ stride 2 
 → $5\times8\times8$ : pour chaque cellule $(t_o, t_x, t_y, t_w, t_h)$ → décodage → NMS → une boîte.
 Le problème est simplifié par rapport au cours : une seule figure, une seule classe, pas d'ancres,
 une seule échelle. Entraîné 30 époques sur 2 000 images (validation : 400 images), il atteint
-un **IoU moyen de 0,895** et **100 % d'IoU > 0,5** sur les cercles rouges.
+un IoU moyen de 0,895 et 100 % d'IoU > 0,5 sur les cercles rouges.
 
 # 3. Choix de conception
 
 **Générateur.** La forme est tirée uniformément parmi `circle` (0), `square` (1), `triangle` (2) et la couleur
 parmi 5 couleurs (rouge, bleu, vert, jaune, violet). La couleur étant indépendante de la classe, le réseau
-ne peut pas « tricher » : il doit apprendre la **forme**. Le côté varie de 10 à 21 pixels, la position est
+ne peut pas « tricher » : il doit apprendre la forme. Le côté varie de 10 à 21 pixels, la position est
 aléatoire, le fond est un gris clair aléatoire. L'étiquette devient `"cx cy w h class_id"` (pixels).
 
 **Tête.** La conv $1\times1$ passe de 5 à $5 + C = 8$ canaux par cellule :
@@ -42,7 +40,7 @@ objectness $t_o$, boîte $(t_x, t_y, t_w, t_h)$, et $C=3$ logits de classe $(z_1
 La sortie reste un tenseur $8\times G\times G$ : une seule boîte par cellule, mais avec une classe.
 
 **Backbone.** On conserve les contraintes du TP (sortie $32\times8\times8$, BatchNorm et non-linéarité à chaque
-couche) mais chaque étage reçoit une **seconde convolution $3\times3$ de stride 1** :
+couche) mais chaque étage reçoit une seconde convolution $3\times3$ de stride 1 :
 $3\to16\to16$, $16\to32\to32$, $32\to32\to32$ (6 couches, 35 736 paramètres contre 6 309).
 Le champ réceptif et la capacité augmentent sans changer la taille de sortie. Le paramètre `deep=False`
 redonne exactement le backbone du TP, ce qui permet la comparaison de la section 6.
@@ -55,14 +53,14 @@ meilleure boîte. Sa classe est $\arg\max_k p(k)$ avec la probabilité $p(k)$ af
 **Codage (étiquette → cible).** L'image de 64 pixels est découpée en une grille de 8 × 8 cellules de 8 pixels.
 La cellule *responsable* est celle qui contient le centre de la figure :
 colonne = partie entière de cx / 8, ligne = partie entière de cy / 8.
-Dans cette cellule, la cible contient **6 valeurs**, une de plus que dans le TP ; toutes les autres cellules valent 0.
+Dans cette cellule, la cible contient 6 valeurs, une de plus que dans le TP ; toutes les autres cellules valent 0.
 
 | valeur | signification | calcul |
 |---|---|---|
 | objet | une figure est présente | 1 |
 | dx, dy | position du centre dans la cellule (entre 0 et 1) | partie décimale de cx / 8 et de cy / 8 |
 | w, h | taille de la boîte par rapport à l'image | w / 64 et h / 64 |
-| **classe** | **nouveau** : numéro de la forme | 0 (cercle), 1 (carré) ou 2 (triangle) |
+| classe | nouveau : numéro de la forme | 0 (cercle), 1 (carré) ou 2 (triangle) |
 
 Exemple : l'étiquette `25 14 16 16 1` (carré de 16 pixels centré en (25, 14)) donne la cellule ligne 1, colonne 3,
 avec la cible (1 ; 0,125 ; 0,75 ; 0,25 ; 0,25 ; 1).
@@ -73,18 +71,18 @@ avec la cible (1 ; 0,125 ; 0,75 ; 0,25 ; 0,25 ; 1).
 > centre x = (colonne + dx) × 8, centre y = (ligne + dy) × 8 ;  
 > largeur = w × 64, hauteur = h × 64.
 
-**Nouveau :** les 3 dernières valeurs passent par un *softmax*, qui les transforme en 3 probabilités
+Nouveauté : les 3 dernières valeurs passent par un *softmax*, qui les transforme en 3 probabilités
 (cercle, carré, triangle) dont la somme vaut 1. La classe prédite est la plus probable.
 
 **Perte.** On garde les deux termes du TP et on en ajoute un troisième pour la classe :
 
-> **perte = BCE (objet) + 10 × MSE (boîte) + 1 × CE (classe)**
+> perte = BCE (objet) + 10 × MSE (boîte) + 1 × CE (classe)
 
 * **BCE** (entropie croisée binaire) : « y a-t-il un objet ? », sur les 64 cellules. La cellule positive reçoit un
   poids de 10 pour compenser le déséquilibre (1 cellule positive pour 63 négatives).
 * **MSE** (erreur quadratique) : écart entre (dx, dy, w, h) prédits et vrais, sur la cellule positive seulement.
   Ces erreurs étant petites, on les multiplie par 10.
-* **CE** (entropie croisée, **nouveau**) : vaut −log(probabilité donnée à la bonne forme) ; elle est presque nulle si
+* **CE** (entropie croisée, nouveau) : vaut −log(probabilité donnée à la bonne forme) ; elle est presque nulle si
   le réseau est sûr et a raison, et grande s'il se trompe avec assurance. Elle n'est calculée que sur la cellule
   positive : ailleurs il n'y a pas d'objet, donc pas de classe à apprendre.
 
@@ -94,8 +92,8 @@ On n'optimise pas l'IoU directement : elle vaut 0 (donc aucun gradient) dès que
 
 3 000 images d'entraînement et 600 de validation, générées avec des graines différentes.
 Adam, pas $3\cdot10^{-3}$ divisé par 10 à l'époque 30, batches de 64, 40 époques, graine fixe (reproductible).
-Métriques sur la validation : **IoU moyen**, **proportion d'IoU > 0,5**, **précision de classification**,
-**matrice de confusion** et proportion de **détections complètes** (IoU > 0,5 *et* bonne classe).
+Métriques sur la validation : IoU moyen, proportion d'IoU > 0,5, précision de classification,
+matrice de confusion et proportion de détections complètes (IoU > 0,5 et bonne classe).
 
 # 6. Résultats
 
@@ -113,12 +111,12 @@ la localisation s'améliore plus lentement et gagne encore après la baisse du p
 | TP entraîné sur cercles rouges, sans réentraînement | 0,366 | 26,2 % | — | 6 309 |
 | TP réentraîné sur les données multi-classes (boîte seule) | 0,784 | 96,3 % | — | 6 309 |
 | Multi-classes, backbone du TP (`deep=False`) | 0,777 | 95,5 % | 99,8 % | 6 408 |
-| **Multi-classes, backbone profond** | **0,949** | **100 %** | **100 %** | 35 736 |
+| Multi-classes, backbone profond | 0,949 | 100 % | 100 % | 35 736 |
 
-Pour le modèle final, la détection complète (IoU > 0,5 et bonne classe) est de **100 %** ; l'IoU moyen par classe
+Pour le modèle final, la détection complète (IoU > 0,5 et bonne classe) est de 100 % ; l'IoU moyen par classe
 vaut 0,953 (cercle), 0,951 (carré) et 0,944 (triangle), et la matrice de confusion est diagonale
 (183 cercles, 209 carrés, 208 triangles, aucune confusion). Selon la taille de la figure, l'IoU moyen passe de
-**0,933** (côté 10–13 px) à 0,954 (14–17 px) et **0,960** (18–21 px).
+0,933 (côté 10–13 px) à 0,954 (14–17 px) et 0,960 (18–21 px).
 
 ![Matrice de confusion et distribution des IoU sur la validation.](../figures/confusion_iou.png){width=88%}
 
@@ -126,8 +124,8 @@ vaut 0,953 (cercle), 0,951 (carré) et 0,944 (triangle), et la matrice de confus
 
 **Exemples visuels.** Boîte prédite verte (classe correcte) ou rouge (classe fausse), vraie boîte en pointillés ;
 titre : classe prédite, probabilité, IoU. Les cas « les plus difficiles » (plus faibles IoU) restent bien localisés
-(IoU ≥ 0,80) : l'erreur résiduelle est un décalage d'un ou deux pixels, surtout sur les **petites figures**
-et sur les figures **collées au bord de l'image**.
+(IoU ≥ 0,80) : l'erreur résiduelle est un décalage d'un ou deux pixels, surtout sur les petites figures
+et sur les figures collées au bord de l'image.
 
 ![Prédictions sur des images de validation.](../figures/predictions.png){width=100%}
 
